@@ -24,6 +24,15 @@ def get_gd_directory(dataset: str, lr: float, arch_id: str, seed: int, opt: str,
         return f"{directory}/lr_{lr}"
     elif opt == "polyak" or opt == "nesterov":
         return f"{directory}/lr_{lr}_beta_{beta}"
+    
+def get_gd_directory_linear(dataset: str, lr: float, arch_id: str, seed: int, opt: str, loss: str, beta: float = None):
+    """Return the directory in which the results should be saved."""
+    results_dir = os.environ["RESULTS"]
+    directory = f"{results_dir}/{dataset}/{arch_id}/seed_{seed}/{loss}/gd_linear/"
+    if opt == "gd":
+        return f"{directory}/lr_{lr}"
+    elif opt == "polyak" or opt == "nesterov":
+        return f"{directory}/lr_{lr}_beta_{beta}"
 
 
 def get_flow_directory(dataset: str, arch_id: str, seed: int, loss: str, tick: float):
@@ -87,10 +96,17 @@ def get_loss_and_acc(loss: str):
         return nn.CrossEntropyLoss(reduction='sum'), AccuracyCE()
     raise NotImplementedError(f"no such loss function: {loss}")
 
-def compute_loss_linear(network, dataset, physical_batch_size):
+def compute_loss_linear(network, loss_fn, X, y):
     params = parameters_to_vector(network.parameters())
-    
-    
+    params_value = parameters_to_vector(network.parameters()).detach()
+    loss = 0
+    predictor = network(X)
+    assert predictor.shape[1] == 1
+    for i in range(predictor.shape[0]):
+        jacobian_i = parameters_to_vector(torch.autograd.grad(predictor[i, 0], network.parameters(), retain_graph = True)).detach()
+        loss += loss_fn(predictor[i, 0].detach() + jacobian_i @ (params - params_value), y[i])
+        #loss += loss_fn(predictor[i, 0], y[i])
+    return loss
 
 def get_gradient(network, loss_fn, dataset, physical_batch_size):
     p = len(parameters_to_vector(network.parameters()))

@@ -28,7 +28,7 @@ def main(dataset: str, arch_id: str, loss: str, opt: str, lr: float, max_steps: 
          loss_goal: float = None, acc_goal: float = None, abridged_size: int = 1000, seed: int = 0, 
          eos_log: float=-1, param_save: float=-1, grad_step = 1, jacobian_sample_interval=1):
     torch.device('cuda', 1)
-    directory = get_gd_directory(dataset, lr, arch_id, seed, opt, loss, beta)
+    directory = get_gd_directory_linear(dataset, lr, arch_id, seed, opt, loss, beta)
     print(f"output directory: {directory}")
     makedirs(directory, exist_ok=True)
     makedirs(directory+"/params", exist_ok=True)
@@ -61,7 +61,7 @@ def main(dataset: str, arch_id: str, loss: str, opt: str, lr: float, max_steps: 
 
     train_loss, test_loss, train_acc, test_acc, lr_iter = \
         torch.zeros(max_steps), torch.zeros(max_steps), torch.zeros(max_steps), torch.zeros(max_steps), torch.zeros(max_steps)
-    loss_dv = torch.zeros(max_steps // iterate_freq if iterate_freq > 0 else 0, len(abridged_train))
+    loss_dv = torch.zeros(max_steps // eig_freq if eig_freq >= 0 else 0, len(abridged_train))
     iterates = torch.zeros(max_steps // iterate_freq if iterate_freq > 0 else 0, len(parameters_to_vector(network.parameters())))
     eigs = torch.zeros(max_steps // eig_freq if eig_freq >= 0 else 0, neigs)
     evecs = torch.zeros(max_steps//eig_freq if eig_freq >= 0 else 0, len(parameters_to_vector(network.parameters())), neigs)
@@ -240,11 +240,31 @@ def main(dataset: str, arch_id: str, loss: str, opt: str, lr: float, max_steps: 
         optimizer.zero_grad()
         for (X, y) in iterate_dataset(train_dataset, physical_batch_size):
             #loss = loss_fn(network(X.cuda()), y.cuda()) / len(train_dataset)
-            loss = compute_loss_linear(network, X.cuda(), y.cuda()) / len(train_dataset)
+            loss = compute_loss_linear(network, loss_fn, X.cuda(), y.cuda()) / len(train_dataset)
+            #print(loss_1, loss)
             if grad_step != -1 and eig_freq != -1 and step % eig_freq == 0:
                 (loss / grad_step).backward()
             else:
                 loss.backward()
+        #print(loss)
+        #for name, param in network.named_parameters():
+        #    print(name, param.grad)
+
+        #print("=========")
+        """
+        optimizer.zero_grad()
+        for (X, y) in iterate_dataset(train_dataset, physical_batch_size):
+            loss = loss_fn(network(X.cuda()), y.cuda()) / len(train_dataset)
+            #loss = compute_loss_linear(network, loss_fn, X.cuda(), y.cuda()) / len(train_dataset)
+            #print(loss_1, loss)
+            if grad_step != -1 and eig_freq != -1 and step % eig_freq == 0:
+                (loss / grad_step).backward()
+            else:
+                loss.backward()
+        print(loss)
+        #for name, param in network.named_parameters():
+        #    print(name, param.grad)
+        """
         
         if step > 0 and eig_freq != -1 and step % eig_freq == 0:
             grad_vec = []
