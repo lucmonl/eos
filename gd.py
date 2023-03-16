@@ -61,7 +61,7 @@ def main(dataset: str, arch_id: str, loss: str, opt: str, lr: float, max_steps: 
 
     train_loss, test_loss, train_acc, test_acc, lr_iter = \
         torch.zeros(max_steps), torch.zeros(max_steps), torch.zeros(max_steps), torch.zeros(max_steps), torch.zeros(max_steps)
-    loss_dv = torch.zeros(max_steps // iterate_freq if iterate_freq > 0 else 0, len(abridged_train))
+    loss_dv = torch.zeros(max_steps // eig_freq if eig_freq >= 0 else 0, len(abridged_train))
     iterates = torch.zeros(max_steps // iterate_freq if iterate_freq > 0 else 0, len(parameters_to_vector(network.parameters())))
     eigs = torch.zeros(max_steps // eig_freq if eig_freq >= 0 else 0, neigs)
     evecs = torch.zeros(max_steps//eig_freq if eig_freq >= 0 else 0, len(parameters_to_vector(network.parameters())), neigs)

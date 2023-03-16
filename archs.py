@@ -152,6 +152,14 @@ def make_deeplinear(L: int, d: int, seed=8):
     network = nn.Sequential(*layers)
     return network.cuda()
 
+def make_one_layer_linear(d: int, dataset_name: str, seed=8):
+    torch.manual_seed(seed)
+    layers = [nn.Flatten()]
+    layers.append(nn.Linear(num_pixels(dataset_name), d, bias=False))
+    layers.append(nn.Linear(d, num_classes(dataset_name), bias=False))
+    network = nn.Sequential(*layers)
+    return network.cuda()
+
 def make_one_layer_network(h=10, seed=0, activation='tanh', sigma_w=1.9):
     torch.manual_seed(seed)
     network = nn.Sequential(
@@ -215,6 +223,8 @@ def load_architecture(arch_id: str, dataset_name: str) -> nn.Module:
         return make_deeplinear(20, 50)
     elif arch_id == 'regression':
         return make_one_layer_network(h=100, activation='tanh')
+    elif arch_id == 'linear-50':
+        return make_one_layer_linear(50, dataset_name)
 
     # ======= vary depth =======
     elif arch_id == 'fc-tanh-depth1':
