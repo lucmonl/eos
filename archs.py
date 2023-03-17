@@ -160,6 +160,28 @@ def make_one_layer_linear(d: int, dataset_name: str, seed=8):
     network = nn.Sequential(*layers)
     return network.cuda()
 
+def make_one_layer_diagonal(dataset_name: str, seed=8):
+    torch.manual_seed(seed)
+    layers = [nn.Flatten()]
+
+    class DiagonalLayer(nn.Module):
+        """ Custom \sum u_i v_i x_bi """
+        def __init__(self, size_in):
+            super().__init__()
+            self.v = nn.Parameter(torch.empty(size_in))
+            self.u = nn.Parameter(torch.empty(size_in))
+            nn.init.uniform_(self.v,-0.1,0.1)
+            nn.init.uniform_(self.u,-0.1,0.1)
+            print(self.v)
+
+        def forward(self, x):
+            out= torch.einsum('i,i,bi->b', self.u, self.v, x)
+            return out.unsqueeze(-1)
+
+    layers.append(DiagonalLayer(num_pixels(dataset_name)))
+    network = nn.Sequential(*layers)
+    return network.cuda()
+
 def make_one_layer_network(h=10, seed=0, activation='tanh', sigma_w=1.9):
     torch.manual_seed(seed)
     network = nn.Sequential(
@@ -225,6 +247,8 @@ def load_architecture(arch_id: str, dataset_name: str) -> nn.Module:
         return make_one_layer_network(h=100, activation='tanh')
     elif arch_id == 'linear-50':
         return make_one_layer_linear(50, dataset_name)
+    elif arch_id == 'diagonal':
+        return make_one_layer_diagonal(dataset_name)
 
     # ======= vary depth =======
     elif arch_id == 'fc-tanh-depth1':

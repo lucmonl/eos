@@ -49,8 +49,10 @@ def main(dataset: str, arch_id: str, loss: str, opt: str, lr: float, max_steps: 
     print("class number:", num_class)
     for name, param in network.named_parameters():
         print(name, param.shape)
-    w_shape = p - param.shape[0] * param.shape[1]
-    #print("first layer parameter:", w_shape)
+    
+    if arch_id != 'diagonal':
+        w_shape = p - param.shape[0] * param.shape[1]
+        #print("first layer parameter:", w_shape)
     torch.manual_seed(7)
     projectors = torch.randn(nproj, len(parameters_to_vector(network.parameters())))
 
@@ -126,6 +128,7 @@ def main(dataset: str, arch_id: str, loss: str, opt: str, lr: float, max_steps: 
             evecs[step // eig_freq] = evec
             hessian_gradient_product[step // eig_freq] = compute_hessian_grad_product(network, loss_fn, abridged_train, grad_vecs[step // eig_freq],
                                                          physical_batch_size, sample_interval=jacobian_sample_interval)
+            
             #gn_eigs[step // eig_freq, :], gn_evecs = get_gauss_newton_eigenvalues(network, abridged_train, neigs=neigs, num_class = num_class)
             #gn_eigs_w[step // eig_freq, :], gn_eigs_w_evec = get_gauss_newton_w_eigenvalues(network, abridged_train, neigs=neigs, num_class = num_class, w_shape = w_shape)
             #gn_eigs_u[step // eig_freq, :], gn_eigs_u_evec = get_gauss_newton_u_eigenvalues(network, abridged_train, neigs=neigs, num_class = num_class, w_shape = w_shape)
@@ -194,13 +197,13 @@ def main(dataset: str, arch_id: str, loss: str, opt: str, lr: float, max_steps: 
         if save_freq != -1 and step % save_freq == 0:
             print("saving")
             
-            save_files(directory, [#("eigs", eigs[:step // eig_freq]), 
+            save_files(directory, [("eigs", eigs[:step // eig_freq]), 
                                    #("iterates", iterates[:step // iterate_freq]),
                                    #("evecs", evecs[:step // eig_freq]),
                                    ("loss_derivative", loss_dv[:step // eig_freq]),
                                    ("grad_vecs", grad_vecs[:step // eig_freq]),
                                    #("hessian_grad_product", hessian_gradient_product[:step // eig_freq]),
-                                   #("train_loss", train_loss[:step]), #("test_loss", test_loss[:step]),
+                                   ("train_loss", train_loss[:step]), #("test_loss", test_loss[:step]),
                                    #("gauss_newton_eigs_w_class", gn_eigs_w_class[:step // eig_freq]),
                                    #("gauss_newton_eigs_w", gn_eigs_w[:step // eig_freq]),
                                    #("gauss_newton_eigs_u", gn_eigs_u[:step // eig_freq]),
