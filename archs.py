@@ -172,7 +172,12 @@ def make_one_layer_diagonal(dataset_name: str, seed=8):
             self.u = nn.Parameter(torch.empty(size_in))
             nn.init.uniform_(self.v,-0.1,0.1)
             nn.init.uniform_(self.u,-0.1,0.1)
+            #self.u = self.v.data
+            #self.u = nn.Parameter(self.v)
+            #nn.init.constant_(self.v, 0)
+            #nn.init.constant_(self.u, 0)
             print(self.v)
+            print(self.u)
 
         def forward(self, x):
             out= torch.einsum('i,i,bi->b', self.u, self.v, x)

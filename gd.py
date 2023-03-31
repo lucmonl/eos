@@ -63,30 +63,30 @@ def main(dataset: str, arch_id: str, loss: str, opt: str, lr: float, max_steps: 
 
     train_loss, test_loss, train_acc, test_acc, lr_iter = \
         torch.zeros(max_steps), torch.zeros(max_steps), torch.zeros(max_steps), torch.zeros(max_steps), torch.zeros(max_steps)
-    loss_dv = torch.zeros(max_steps // eig_freq if eig_freq >= 0 else 0, len(abridged_train))
+    loss_dv = torch.zeros(max_steps // eig_freq if eig_freq >= 0 else 0, len(abridged_train), num_class)
     iterates = torch.zeros(max_steps // iterate_freq if iterate_freq > 0 else 0, len(parameters_to_vector(network.parameters())))
     eigs = torch.zeros(max_steps // eig_freq if eig_freq >= 0 else 0, neigs)
     evecs = torch.zeros(max_steps//eig_freq if eig_freq >= 0 else 0, len(parameters_to_vector(network.parameters())), neigs)
     weight_norm_l1 = torch.zeros(max_steps // eig_freq if eig_freq >= 0 else 0, 4)
     weight_norm_l2_l1 = torch.zeros(max_steps // eig_freq if eig_freq >= 0 else 0, 4)
     gn_eigs = torch.zeros(max_steps // eig_freq if eig_freq >= 0 else 0, neigs)
-    gn_eigs_w = torch.zeros(max_steps // eig_freq if eig_freq >= 0 else 0, neigs)
-    gn_eigs_u = torch.zeros(max_steps // eig_freq if eig_freq >= 0 else 0, neigs)
-    gn_evecs = torch.zeros(max_steps // eig_freq if eig_freq >= 0 else 0, len(abridged_train) * num_class, neigs)
-    gn_evecs_w = torch.zeros(max_steps // eig_freq if eig_freq >= 0 else 0, len(abridged_train) * num_class, neigs)
-    gn_evecs_u = torch.zeros(max_steps // eig_freq if eig_freq >= 0 else 0, len(abridged_train) * num_class, neigs)
-    gn_eigs_w_class = torch.zeros(max_steps // eig_freq if eig_freq >= 0 else 0, num_class, neigs)
-    jacobian_norm = torch.zeros(max_steps // eig_freq if eig_freq >= 0 else 0, len(abridged_train) * num_class)
-    jacobian = torch.zeros(max_steps // eig_freq if eig_freq >= 0 else 0, p, (len(abridged_train) // jacobian_sample_interval )* num_class)
-    gn_evecs_top = torch.zeros(max_steps // eig_freq if eig_freq >= 0 else 0, p)
+    #gn_eigs_w = torch.zeros(max_steps // eig_freq if eig_freq >= 0 else 0, neigs)
+    #gn_eigs_u = torch.zeros(max_steps // eig_freq if eig_freq >= 0 else 0, neigs)
+    #gn_evecs = torch.zeros(max_steps // eig_freq if eig_freq >= 0 else 0, len(abridged_train) * num_class, neigs)
+    #gn_evecs_w = torch.zeros(max_steps // eig_freq if eig_freq >= 0 else 0, len(abridged_train) * num_class, neigs)
+    #gn_evecs_u = torch.zeros(max_steps // eig_freq if eig_freq >= 0 else 0, len(abridged_train) * num_class, neigs)
+    #gn_eigs_w_class = torch.zeros(max_steps // eig_freq if eig_freq >= 0 else 0, num_class, neigs)
+    #jacobian_norm = torch.zeros(max_steps // eig_freq if eig_freq >= 0 else 0, len(abridged_train) * num_class)
+    #jacobian = torch.zeros(max_steps // eig_freq if eig_freq >= 0 else 0, p, (len(abridged_train) // jacobian_sample_interval )* num_class)
+    #gn_evecs_top = torch.zeros(max_steps // eig_freq if eig_freq >= 0 else 0, p)
     #delta_c_eigs = torch.zeros(max_steps // eig_freq if eig_freq >= 0 else 0, num_class-1)
     #delta_c_c_eigs = torch.zeros(max_steps // eig_freq if eig_freq >= 0 else 0, neigs)
     #fld_eigs = torch.zeros(max_steps // eig_freq if eig_freq >= 0 else 0, num_class-1)
 
     eigs_trim = torch.zeros(max_steps // eig_freq if eig_freq >= 0 else 0, neigs, grad_step if grad_step >= 1 else 0)
-    eigs_grad = torch.zeros(max_steps // eig_freq if eig_freq >= 0 else 0, len(parameters_to_vector(network.parameters())))
-    hessian_gradient_product = torch.zeros(max_steps // eig_freq if eig_freq >= 0 else 0, len(abridged_train) // jacobian_sample_interval, len(parameters_to_vector(network.parameters())))
-    grad_vecs = torch.zeros(max_steps // eig_freq if eig_freq >= 0 else 0, len(parameters_to_vector(network.parameters())))
+    #eigs_grad = torch.zeros(max_steps // eig_freq if eig_freq >= 0 else 0, len(parameters_to_vector(network.parameters())))
+    #hessian_gradient_product = torch.zeros(max_steps // eig_freq if eig_freq >= 0 else 0, len(abridged_train) // jacobian_sample_interval, len(parameters_to_vector(network.parameters())))
+    #grad_vecs = torch.zeros(max_steps // eig_freq if eig_freq >= 0 else 0, len(parameters_to_vector(network.parameters())))
     #evec_start = 1000
     #eigs_top = torch.zeros((max_steps - evec_start)//1000 if eig_freq >= 0 else 0, 20)
     #evecs = torch.zeros((max_steps - evec_start)//1000 if eig_freq >= 0 else 0, len(parameters_to_vector(network.parameters())), 20)
@@ -122,18 +122,18 @@ def main(dataset: str, arch_id: str, loss: str, opt: str, lr: float, max_steps: 
             #save_files(directory, [("gauss_newton_matrix_u", gauss_newton_matrix_u.cpu())])
             #sys.exit()
             #gn_eigs_u_matrix = torch.FloatTensor(scipy.linalg.eigh(gauss_newton_matrix_u.cpu().numpy(), eigvals=(gauss_newton_matrix_u.shape[0]-neigs,gauss_newton_matrix_u.shape[0]-1))[1]).cuda()
-            grad_vecs[step // eig_freq, :], loss_dv[step // eig_freq, :] = get_gradient(network, loss_fn, abridged_train, physical_batch_size)
+            #grad_vecs[step // eig_freq, :], loss_dv[step // eig_freq, :] = get_gradient(network, loss_fn, abridged_train, physical_batch_size)
             eigs[step // eig_freq, :], evec, _, _ = get_hessian_eigenvalues(network, loss_fn, lr, abridged_train, neigs=neigs,
                                                                 physical_batch_size=physical_batch_size, return_smallest=False)
             evecs[step // eig_freq] = evec
-            hessian_gradient_product[step // eig_freq] = compute_hessian_grad_product(network, loss_fn, abridged_train, grad_vecs[step // eig_freq],
-                                                         physical_batch_size, sample_interval=jacobian_sample_interval)
+            #hessian_gradient_product[step // eig_freq] = compute_hessian_grad_product(network, loss_fn, abridged_train, grad_vecs[step // eig_freq],
+            #                                             physical_batch_size, sample_interval=jacobian_sample_interval)
             
             #gn_eigs[step // eig_freq, :], gn_evecs = get_gauss_newton_eigenvalues(network, abridged_train, neigs=neigs, num_class = num_class)
             #gn_eigs_w[step // eig_freq, :], gn_eigs_w_evec = get_gauss_newton_w_eigenvalues(network, abridged_train, neigs=neigs, num_class = num_class, w_shape = w_shape)
             #gn_eigs_u[step // eig_freq, :], gn_eigs_u_evec = get_gauss_newton_u_eigenvalues(network, abridged_train, neigs=neigs, num_class = num_class, w_shape = w_shape)
             #jacobian_norm[step // eig_freq, :] = compute_jacobian_norm(network, abridged_train, num_class)
-            jacobian[step // eig_freq] = compute_jacobian(network, abridged_train, num_class, sample_interval=jacobian_sample_interval)
+            #jacobian[step // eig_freq] = compute_jacobian(network, abridged_train, num_class, sample_interval=jacobian_sample_interval)
             #gn_evecs_top[step // eig_freq, :] = gn_evecs[:, 0].cpu()
             #print(gn_eigs_u[step // eig_freq, :])
             #save_files(directory, [("gn_evec_u_mat_{}".format(step), gn_eigs_u_matrix.cpu())])
@@ -184,7 +184,7 @@ def main(dataset: str, arch_id: str, loss: str, opt: str, lr: float, max_steps: 
                 evecs[(step-evec_start) // 1000] = evec
             """
             print("hessian eigenvalues: ", eigs[step//eig_freq, :])
-            #print("gauss-newton eigenvalues: ", gn_eigs[step//eig_freq, :])
+            print("gauss-newton eigenvalues: ", gn_eigs[step//eig_freq, :])
             #print("decomp eigenvalues: ", delta_c_eigs[step//eig_freq, :])
             #print("fld eigenvalues: ", fld_eigs[step//eig_freq, :])
             #print("eigenvalues: ", delta_c_c_eigs[step//eig_freq, :])
@@ -198,10 +198,10 @@ def main(dataset: str, arch_id: str, loss: str, opt: str, lr: float, max_steps: 
             print("saving")
             
             save_files(directory, [("eigs", eigs[:step // eig_freq]), 
-                                   #("iterates", iterates[:step // iterate_freq]),
+                                   ("iterates", iterates[:step // iterate_freq]),
                                    #("evecs", evecs[:step // eig_freq]),
-                                   ("loss_derivative", loss_dv[:step // eig_freq]),
-                                   ("grad_vecs", grad_vecs[:step // eig_freq]),
+                                   #("loss_derivative", loss_dv[:step // eig_freq]),
+                                   #("grad_vecs", grad_vecs[:step // eig_freq]),
                                    #("hessian_grad_product", hessian_gradient_product[:step // eig_freq]),
                                    ("train_loss", train_loss[:step]), #("test_loss", test_loss[:step]),
                                    #("gauss_newton_eigs_w_class", gn_eigs_w_class[:step // eig_freq]),
