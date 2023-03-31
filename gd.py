@@ -7,6 +7,7 @@ import torch
 from torch.nn.utils import parameters_to_vector
 
 import argparse
+from device_variable import device
 
 from data import num_classes
 from archs import load_architecture
@@ -27,7 +28,7 @@ def main(dataset: str, arch_id: str, loss: str, opt: str, lr: float, max_steps: 
          save_model: bool = False, beta: float = 0.0, nproj: int = 0,
          loss_goal: float = None, acc_goal: float = None, abridged_size: int = 1000, seed: int = 0, 
          eos_log: float=-1, param_save: float=-1, grad_step = 1, jacobian_sample_interval=1):
-    torch.device('cuda', 1)
+    # torch.device('cuda', 1)
     directory = get_gd_directory(dataset, lr, arch_id, seed, opt, loss, beta)
     print(f"output directory: {directory}")
     makedirs(directory, exist_ok=True)
@@ -43,7 +44,7 @@ def main(dataset: str, arch_id: str, loss: str, opt: str, lr: float, max_steps: 
     loss_fn, acc_fn = get_loss_and_acc(loss)
 
     torch.manual_seed(seed)
-    network = load_architecture(arch_id, dataset).cuda()
+    network = load_architecture(arch_id, dataset).to(device)
     p = len(parameters_to_vector(network.parameters()))
     print("parameter:", p)
     print("class number:", num_class)
@@ -102,7 +103,8 @@ def main(dataset: str, arch_id: str, loss: str, opt: str, lr: float, max_steps: 
     loss_eos = []
     l_eigs_eos = []
     s_eigs_eos = []
-
+    
+    print("hello")
     for step in range(0, max_steps):
         #print(lr_scheduler.get_lr()[0])
         #lr_iter[step] = lr_scheduler.get_lr()[0]
@@ -121,7 +123,7 @@ def main(dataset: str, arch_id: str, loss: str, opt: str, lr: float, max_steps: 
             #gauss_newton_matrix_u = get_gauss_newton_matrix_u(network, abridged_train, num_class = num_class, w_shape = w_shape)
             #save_files(directory, [("gauss_newton_matrix_u", gauss_newton_matrix_u.cpu())])
             #sys.exit()
-            #gn_eigs_u_matrix = torch.FloatTensor(scipy.linalg.eigh(gauss_newton_matrix_u.cpu().numpy(), eigvals=(gauss_newton_matrix_u.shape[0]-neigs,gauss_newton_matrix_u.shape[0]-1))[1]).cuda()
+            #gn_eigs_u_matrix = torch.FloatTensor(scipy.linalg.eigh(gauss_newton_matrix_u.cpu().numpy(), eigvals=(gauss_newton_matrix_u.shape[0]-neigs,gauss_newton_matrix_u.shape[0]-1))[1]).to(device)
             #grad_vecs[step // eig_freq, :], loss_dv[step // eig_freq, :] = get_gradient(network, loss_fn, abridged_train, physical_batch_size)
             eigs[step // eig_freq, :], evec, _, _ = get_hessian_eigenvalues(network, loss_fn, lr, abridged_train, neigs=neigs,
                                                                 physical_batch_size=physical_batch_size, return_smallest=False)
@@ -147,11 +149,11 @@ def main(dataset: str, arch_id: str, loss: str, opt: str, lr: float, max_steps: 
             for i in range(10):
                 print(i)
                 gnvp_u = compute_gnvp_u(network, abridged_train, gn_eigs_u_evec[:,i], num_class, w_shape)
-                print(cosine_similarity(gnvp_u, gn_eigs_u_evec[:,i].cuda()))
+                print(cosine_similarity(gnvp_u, gn_eigs_u_evec[:,i].to(device)))
                 gnvp_u = compute_gnvp_u(network, abridged_train, gn_eigs_u_matrix[:,i], num_class, w_shape)
                 print(cosine_similarity(gnvp_u, gn_eigs_u_matrix[:,i]))
-                gnvp_u = gauss_newton_matrix_u @ gn_eigs_u_evec[:,i].cuda()
-                print(cosine_similarity(gnvp_u, gn_eigs_u_evec[:,i].cuda()))
+                gnvp_u = gauss_newton_matrix_u @ gn_eigs_u_evec[:,i].to(device)
+                print(cosine_similarity(gnvp_u, gn_eigs_u_evec[:,i].to(device)))
                 gnvp_u = gauss_newton_matrix_u @ gn_eigs_u_matrix[:,i]
                 print(cosine_similarity(gnvp_u, gn_eigs_u_matrix[:,i]))
             """
@@ -240,7 +242,7 @@ def main(dataset: str, arch_id: str, loss: str, opt: str, lr: float, max_steps: 
 
         optimizer.zero_grad()
         for (X, y) in iterate_dataset(train_dataset, physical_batch_size):
-            loss = loss_fn(network(X.cuda()), y.cuda()) / len(train_dataset)
+            loss = loss_fn(network(X.to(device)), y.to(device)) / len(train_dataset)
             if grad_step != -1 and eig_freq != -1 and step % eig_freq == 0:
                 (loss / grad_step).backward()
             else:

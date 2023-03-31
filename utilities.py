@@ -11,6 +11,7 @@ from torch.optim.optimizer import Optimizer
 from torch.utils.data import Dataset, DataLoader
 import os
 import sys
+from device_variable import device
 
 # the default value for "physical batch size", which is the largest batch size that we try to put on the GPU
 DEFAULT_PHYS_BS = 1000
@@ -71,8 +72,9 @@ def save_files_final(directory: str, arrays: List[Tuple[str, torch.Tensor]]):
 def iterate_dataset(dataset: Dataset, batch_size: int):
     """Iterate through a dataset, yielding batches of data."""
     loader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
+    #print(device)
     for (batch_X, batch_y) in loader:
-        yield batch_X.cuda(), batch_y.cuda()
+        yield batch_X.to(device), batch_y.to(device)
 
 
 def compute_losses(network: nn.Module, loss_functions: List[nn.Module], dataset: Dataset,
@@ -111,7 +113,7 @@ def compute_loss_linear(network, loss_fn, X, y):
 def get_gradient(network, loss_fn, dataset, physical_batch_size):
     p = len(parameters_to_vector(network.parameters()))
     n = len(dataset)
-    gradient = torch.zeros(p, dtype=torch.float, device='cuda')
+    gradient = torch.zeros(p, dtype=torch.float, device=device)
     loss_derivative = []
     for (X, y) in iterate_dataset(dataset, physical_batch_size):
         predictor = network(X)
@@ -126,8 +128,8 @@ def compute_hessian_grad_product(network: nn.Module, loss_fn: nn.Module,
                 dataset: Dataset, vector: Tensor, physical_batch_size: int = DEFAULT_PHYS_BS, sample_interval: int=100):
     p = len(parameters_to_vector(network.parameters()))
     n = len(dataset)
-    hvp = torch.zeros((n // sample_interval, p), dtype=torch.float, device='cuda')
-    vector = vector.cuda()
+    hvp = torch.zeros((n // sample_interval, p), dtype=torch.float, device=device)
+    vector = vector.to(device)
     sample_id = 0
     for (X, y) in iterate_dataset(dataset, 1):
         if sample_id % sample_interval == 0:
@@ -144,8 +146,8 @@ def compute_hvp(network: nn.Module, loss_fn: nn.Module,
     """Compute a Hessian-vector product."""
     p = len(parameters_to_vector(network.parameters()))
     n = len(dataset)
-    hvp = torch.zeros(p, dtype=torch.float, device='cuda')
-    vector = vector.cuda()
+    hvp = torch.zeros(p, dtype=torch.float, device=device)
+    vector = vector.to(device)
     for (X, y) in iterate_dataset(dataset, physical_batch_size):
         loss = loss_fn(network(X), y) / n
         grads = torch.autograd.grad(loss, inputs=network.parameters(), create_graph=True)
@@ -159,8 +161,8 @@ def compute_hvp_smallest(network: nn.Module, loss_fn: nn.Module, alpha:float,
     """Compute a Hessian-vector product."""
     p = len(parameters_to_vector(network.parameters()))
     n = len(dataset)
-    hvp = torch.zeros(p, dtype=torch.float, device='cuda')
-    vector = vector.cuda()
+    hvp = torch.zeros(p, dtype=torch.float, device=device)
+    vector = vector.to(device)
     for (X, y) in iterate_dataset(dataset, physical_batch_size):
         loss = loss_fn(network(X), y) / n
         grads = torch.autograd.grad(loss, inputs=network.parameters(), create_graph=True)
@@ -175,7 +177,7 @@ def lanczos(matrix_vector, dim: int, neigs: int):
     (which we can access via matrix-vector products). """
 
     def mv(vec: np.ndarray):
-        gpu_vec = torch.tensor(vec, dtype=torch.float).cuda()
+        gpu_vec = torch.tensor(vec, dtype=torch.float).to(device)
         return matrix_vector(gpu_vec)
 
     operator = LinearOperator((dim, dim), matvec=mv)
@@ -280,9 +282,9 @@ def get_eig_grad(network: nn.Module, loss_fn: nn.Module, dataset: Dataset,
     p = len(parameters_to_vector(network.parameters()))
     n = len(dataset)
     print("param:", p)
-    eig_vec = eig_vec.cuda()
-    eig_grad = torch.zeros(p, dtype=torch.float, device='cuda')
-    grad_sum = torch.zeros(p, dtype=torch.float, device='cuda')
+    eig_vec = eig_vec.to(device)
+    eig_grad = torch.zeros(p, dtype=torch.float, device=device)
+    grad_sum = torch.zeros(p, dtype=torch.float, device=device)
     for (X, y) in iterate_dataset(dataset, physical_batch_size):
         loss = loss_fn(network(X), y) / n
         grads = torch.autograd.grad(loss, network.parameters(), create_graph=True)
@@ -296,10 +298,10 @@ def get_eig_grad(network: nn.Module, loss_fn: nn.Module, dataset: Dataset,
 def compute_gnvp(network: nn.Module, dataset: Dataset, vector: Tensor, num_class: int):
     p = len(parameters_to_vector(network.parameters()))
     n = len(dataset)
-    #gnvp = torch.zeros(p, dtype=torch.float, device='cuda')
-    gnvp = torch.zeros(p, dtype=torch.float, device='cuda')
-    vector = vector.cuda()
-    pred_grad = torch.zeros((p, num_class), dtype=torch.float, device='cuda')
+    #gnvp = torch.zeros(p, dtype=torch.float, device=device)
+    gnvp = torch.zeros(p, dtype=torch.float, device=device)
+    vector = vector.to(device)
+    pred_grad = torch.zeros((p, num_class), dtype=torch.float, device=device)
     for (X, _) in iterate_dataset(dataset, 1):
         predictor = network(X)
         for i in range(predictor.shape[1]):
@@ -311,7 +313,7 @@ def compute_gnvp(network: nn.Module, dataset: Dataset, vector: Tensor, num_class
 def compute_jacobian_norm(network: nn.Module, dataset: Dataset, num_class: int):
     p = len(parameters_to_vector(network.parameters()))
     n = len(dataset)
-    #gnvp = torch.zeros(p, dtype=torch.float, device='cuda')
+    #gnvp = torch.zeros(p, dtype=torch.float, device=device)
     jacobian_norm = torch.zeros(n * num_class, dtype=torch.float, device='cpu')
     sample_id = 0
     for (X, _) in iterate_dataset(dataset, 1):
@@ -325,7 +327,7 @@ def compute_jacobian_norm(network: nn.Module, dataset: Dataset, num_class: int):
 def compute_jacobian(network: nn.Module, dataset: Dataset, num_class: int, sample_interval: int):
     p = len(parameters_to_vector(network.parameters()))
     n = len(dataset)
-    #gnvp = torch.zeros(p, dtype=torch.float, device='cuda')
+    #gnvp = torch.zeros(p, dtype=torch.float, device=device)
     jacobian = torch.zeros(p, (n // sample_interval) * num_class, dtype=torch.float, device='cpu')
     sample_id = 0
     for (X, _) in iterate_dataset(dataset, 1):
@@ -340,10 +342,10 @@ def compute_jacobian(network: nn.Module, dataset: Dataset, num_class: int, sampl
 def compute_gnvp_w(network: nn.Module, dataset: Dataset, vector: Tensor, num_class: int, w_shape: int):
     p = len(parameters_to_vector(network.parameters()))
     n = len(dataset)
-    #gnvp = torch.zeros(p, dtype=torch.float, device='cuda')
-    gnvp = torch.zeros(w_shape, dtype=torch.float, device='cuda')
-    vector = vector.cuda()
-    pred_grad = torch.zeros((w_shape, num_class), dtype=torch.float, device='cuda')
+    #gnvp = torch.zeros(p, dtype=torch.float, device=device)
+    gnvp = torch.zeros(w_shape, dtype=torch.float, device=device)
+    vector = vector.to(device)
+    pred_grad = torch.zeros((w_shape, num_class), dtype=torch.float, device=device)
     for (X, _) in iterate_dataset(dataset, 1):
         predictor = network(X)
         for i in range(predictor.shape[1]):
@@ -355,10 +357,10 @@ def compute_gnvp_w(network: nn.Module, dataset: Dataset, vector: Tensor, num_cla
 def get_gauss_newton_matrix_u(network: nn.Module, dataset: Dataset, num_class: int, w_shape: int):
     p = len(parameters_to_vector(network.parameters()))
     n = len(dataset)
-    jacobian = torch.zeros((p-w_shape, n * num_class), dtype=torch.float, device='cuda')
-    #gnvp = torch.zeros(w_shape, dtype=torch.float, device='cuda')
-    #vector = vector.cuda()
-    #pred_grad = torch.zeros((w_shape, num_class), dtype=torch.float, device='cuda')
+    jacobian = torch.zeros((p-w_shape, n * num_class), dtype=torch.float, device=device)
+    #gnvp = torch.zeros(w_shape, dtype=torch.float, device=device)
+    #vector = vector.to(device)
+    #pred_grad = torch.zeros((w_shape, num_class), dtype=torch.float, device=device)
     sample_id = 0
     for (X, _) in iterate_dataset(dataset, 1):
         predictor = network(X)
@@ -377,9 +379,9 @@ def get_gauss_newton_matrix_u(network: nn.Module, dataset: Dataset, num_class: i
 def compute_gnvp_multiple(network: nn.Module, dataset: Dataset, vectors: Tensor, num_class: int):
     p = len(parameters_to_vector(network.parameters()))
     n = len(dataset)
-    #gnvp = torch.zeros(p, dtype=torch.float, device='cuda')
-    gnvp = torch.zeros((n*num_class, vectors.shape[1]), dtype=torch.float, device='cuda')
-    vectors = vectors.cuda()
+    #gnvp = torch.zeros(p, dtype=torch.float, device=device)
+    gnvp = torch.zeros((n*num_class, vectors.shape[1]), dtype=torch.float, device=device)
+    vectors = vectors.to(device)
     sample_id = 0
     for (X, _) in iterate_dataset(dataset, 1):
         predictor = network(X)
@@ -392,9 +394,9 @@ def compute_gnvp_multiple(network: nn.Module, dataset: Dataset, vectors: Tensor,
 def compute_gnvp_w_multiple(network: nn.Module, dataset: Dataset, vectors: Tensor, num_class: int, w_shape: int):
     p = len(parameters_to_vector(network.parameters()))
     n = len(dataset)
-    #gnvp = torch.zeros(p, dtype=torch.float, device='cuda')
-    gnvp = torch.zeros((n*num_class, vectors.shape[1]), dtype=torch.float, device='cuda')
-    vectors = vectors.cuda()
+    #gnvp = torch.zeros(p, dtype=torch.float, device=device)
+    gnvp = torch.zeros((n*num_class, vectors.shape[1]), dtype=torch.float, device=device)
+    vectors = vectors.to(device)
     sample_id = 0
     for (X, _) in iterate_dataset(dataset, 1):
         predictor = network(X)
@@ -407,10 +409,10 @@ def compute_gnvp_w_multiple(network: nn.Module, dataset: Dataset, vectors: Tenso
 def compute_gnvp_w_i(network: nn.Module, dataset: Dataset, vector: Tensor, num_class: int, w_shape: int, class_index_true: int):
     p = len(parameters_to_vector(network.parameters()))
     n = len(dataset)
-    #gnvp = torch.zeros(p, dtype=torch.float, device='cuda')
-    gnvp = torch.zeros(w_shape, dtype=torch.float, device='cuda')
-    vector = vector.cuda()
-    pred_grad = torch.zeros((w_shape, num_class), dtype=torch.float, device='cuda')
+    #gnvp = torch.zeros(p, dtype=torch.float, device=device)
+    gnvp = torch.zeros(w_shape, dtype=torch.float, device=device)
+    vector = vector.to(device)
+    pred_grad = torch.zeros((w_shape, num_class), dtype=torch.float, device=device)
     for (X, y) in iterate_dataset(dataset, 1):
         class_index = torch.where(y==1)[1][0].item()
         if (class_index_true != class_index):
@@ -425,9 +427,9 @@ def compute_gnvp_w_i(network: nn.Module, dataset: Dataset, vector: Tensor, num_c
 def compute_gnvp_u_multiple(network: nn.Module, dataset: Dataset, vectors: Tensor, num_class: int, w_shape: int):
     p = len(parameters_to_vector(network.parameters()))
     n = len(dataset)
-    #gnvp = torch.zeros(p, dtype=torch.float, device='cuda')
-    gnvp = torch.zeros((n*num_class, vectors.shape[1]), dtype=torch.float, device='cuda')
-    vectors = vectors.cuda()
+    #gnvp = torch.zeros(p, dtype=torch.float, device=device)
+    gnvp = torch.zeros((n*num_class, vectors.shape[1]), dtype=torch.float, device=device)
+    vectors = vectors.to(device)
     sample_id = 0
     for (X, _) in iterate_dataset(dataset, 1):
         predictor = network(X)
@@ -440,10 +442,10 @@ def compute_gnvp_u_multiple(network: nn.Module, dataset: Dataset, vectors: Tenso
 def compute_gnvp_u(network: nn.Module, dataset: Dataset, vector: Tensor, num_class: int, w_shape: int):
     p = len(parameters_to_vector(network.parameters()))
     n = len(dataset)
-    #gnvp = torch.zeros(p, dtype=torch.float, device='cuda')
-    gnvp = torch.zeros(p-w_shape, dtype=torch.float, device='cuda')
-    vector = vector.cuda()
-    pred_grad = torch.zeros((p-w_shape, num_class), dtype=torch.float, device='cuda')
+    #gnvp = torch.zeros(p, dtype=torch.float, device=device)
+    gnvp = torch.zeros(p-w_shape, dtype=torch.float, device=device)
+    vector = vector.to(device)
+    pred_grad = torch.zeros((p-w_shape, num_class), dtype=torch.float, device=device)
     for (X, _) in iterate_dataset(dataset, 1):
         predictor = network(X)
         for i in range(predictor.shape[1]):
@@ -455,9 +457,9 @@ def compute_gnvp_u(network: nn.Module, dataset: Dataset, vector: Tensor, num_cla
 def compute_delta_c_vp(network: nn.Module, dataset: Dataset, vector: Tensor, num_class: int):
     p = len(parameters_to_vector(network.parameters()))
     n = len(dataset)
-    gnvp = torch.zeros(p, dtype=torch.float, device='cuda')
-    vector = vector.cuda()
-    pred_grad = torch.zeros((p, num_class), dtype=torch.float, device='cuda')
+    gnvp = torch.zeros(p, dtype=torch.float, device=device)
+    vector = vector.to(device)
+    pred_grad = torch.zeros((p, num_class), dtype=torch.float, device=device)
     counter = [0 for _ in range(num_class)]
     for (X, y) in iterate_dataset(dataset, 1):
         
@@ -485,9 +487,9 @@ def compute_delta_c_vp(network: nn.Module, dataset: Dataset, vector: Tensor, num
 def compute_fld_vp(network: nn.Module, dataset: Dataset, vector: Tensor, num_class: int):
     p = len(parameters_to_vector(network.parameters()))
     n = len(dataset)
-    gnvp = torch.zeros(p, dtype=torch.float, device='cuda')
-    vector = vector.cuda()
-    pred_grad = torch.zeros((p, num_class), dtype=torch.float, device='cuda')
+    gnvp = torch.zeros(p, dtype=torch.float, device=device)
+    vector = vector.to(device)
+    pred_grad = torch.zeros((p, num_class), dtype=torch.float, device=device)
     grad_avg = 0
     counter = [0 for _ in range(num_class)]
     for (X, y) in iterate_dataset(dataset, 1):
@@ -518,9 +520,9 @@ def compute_fld_vp(network: nn.Module, dataset: Dataset, vector: Tensor, num_cla
 def compute_delta_c_c_vp(network: nn.Module, dataset: Dataset, vector: Tensor):
     p = len(parameters_to_vector(network.parameters()))
     n = len(dataset)
-    #delta_c_c_vp = torch.zeros(p, dtype=torch.float, device='cuda')
-    vector = vector.cuda()
-    delta_c_c_grad = torch.zeros((p, 10), dtype=torch.float, device='cuda')
+    #delta_c_c_vp = torch.zeros(p, dtype=torch.float, device=device)
+    vector = vector.to(device)
+    delta_c_c_grad = torch.zeros((p, 10), dtype=torch.float, device=device)
     for (X, y) in iterate_dataset(dataset, 1):
         class_index = torch.where(y==1)[1][0].item()
         predictor = network(X)
@@ -553,7 +555,7 @@ def compute_gradient(network: nn.Module, loss_fn: nn.Module,
                      dataset: Dataset, physical_batch_size: int = DEFAULT_PHYS_BS):
     """ Compute the gradient of the loss function at the current network parameters. """
     p = len(parameters_to_vector(network.parameters()))
-    average_gradient = torch.zeros(p, device='cuda')
+    average_gradient = torch.zeros(p, device=device)
     for (X, y) in iterate_dataset(dataset, physical_batch_size):
         batch_loss = loss_fn(network(X), y) / len(dataset)
         batch_gradient = parameters_to_vector(torch.autograd.grad(batch_loss, inputs=network.parameters()))
