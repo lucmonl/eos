@@ -121,7 +121,7 @@ def get_gradient(network, loss_fn, dataset, physical_batch_size):
         grad = torch.autograd.grad(loss, inputs=network.parameters(), create_graph=True)
         gradient += parameters_to_vector(grad)
         loss_derivative.append((predictor - y).detach().cpu())
-    loss_derivative = torch.cat(loss_derivative, axis = 0).squeeze()
+    loss_derivative = torch.cat(loss_derivative, axis = 0)#.squeeze()
     return gradient.detach().cpu(), loss_derivative
 
 def compute_hessian_grad_product(network: nn.Module, loss_fn: nn.Module,

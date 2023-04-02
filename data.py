@@ -11,7 +11,7 @@ DATASETS = [
     "chebyshev-4-20", "chebyshev-5-20", "linear-50-50","cifar10-1k-random-10", "cifar10-1k-random-5", 
     "cifar10-1k-random-2", "cifar10-1k-random-1", "cifar10-1k-random-3", "synthetic-1", "synthetic-5", "synthetic-cifar-1", 
     "synthetic-cifar-5", "synthetic-cifar-6", "synthetic-cifar-7", "synthetic-cifar-8", 
-    "synthetic-reduced-cifar-1"
+    "synthetic-reduced-cifar-1","synthetic-unbalanced-reduced-cifar-1", "synthetic-allzero-reduced-cifar-1"
 ]
 
 def flatten(arr: np.ndarray):
