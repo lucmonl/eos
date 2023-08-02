@@ -50,6 +50,7 @@ def main(dataset: str, arch_id: str, loss: str, opt: str, lr: float, max_steps: 
     print("class number:", num_class)
     for name, param in network.named_parameters():
         print(name, param.shape)
+    print("batch size: ", physical_batch_size)
     
     #if arch_id != 'diagonal' and arch_id != 'diagonal-reparam':
     #    w_shape = p - param.shape[0] * param.shape[1]
@@ -64,6 +65,7 @@ def main(dataset: str, arch_id: str, loss: str, opt: str, lr: float, max_steps: 
 
     train_loss, test_loss, train_acc, test_acc, lr_iter = \
         torch.zeros(max_steps), torch.zeros(max_steps), torch.zeros(max_steps), torch.zeros(max_steps), torch.zeros(max_steps)
+    grad_norm = torch.zeros(max_steps)
     loss_dv = torch.zeros(max_steps // eig_freq if eig_freq >= 0 else 0, len(abridged_train), num_class)
     iterates = torch.zeros(max_steps // iterate_freq if iterate_freq > 0 else 0, len(parameters_to_vector(network.parameters())))
     eigs = torch.zeros(max_steps // eig_freq if eig_freq >= 0 else 0, neigs)
@@ -134,7 +136,7 @@ def main(dataset: str, arch_id: str, loss: str, opt: str, lr: float, max_steps: 
             #gn_eigs_w[step // eig_freq, :], gn_eigs_w_evec = get_gauss_newton_w_eigenvalues(network, abridged_train, neigs=neigs, num_class = num_class, w_shape = w_shape)
             #gn_eigs_u[step // eig_freq, :], gn_eigs_u_evec = get_gauss_newton_u_eigenvalues(network, abridged_train, neigs=neigs, num_class = num_class, w_shape = w_shape)
             #jacobian_norm[step // eig_freq, :] = compute_jacobian_norm(network, abridged_train, num_class)
-            #jacobian[step // eig_freq] = compute_jacobian(network, abridged_train, num_class, sample_interval=jacobian_sample_interval)
+            jacobian[step // eig_freq] = compute_jacobian(network, abridged_train, num_class, sample_interval=jacobian_sample_interval)
             #gn_evecs_top[step // eig_freq, :] = gn_evecs[:, 0].cpu()
             #print(gn_eigs_u[step // eig_freq, :])
             #save_files(directory, [("gn_evec_u_mat_{}".format(step), gn_eigs_u_matrix.cpu())])
@@ -198,14 +200,14 @@ def main(dataset: str, arch_id: str, loss: str, opt: str, lr: float, max_steps: 
         if save_freq != -1 and step % save_freq == 0:
             print("saving")
             
-            save_files(directory, [("eigs", eigs[:step // eig_freq]), 
+            save_files(directory, [#("eigs", eigs[:step // eig_freq]), 
                                    #("iterates", iterates[:step // iterate_freq]),
                                    #("evecs", evecs[:step // eig_freq]),
                                    #("loss_derivative", loss_dv[:step // eig_freq]),
                                    #("grad_vecs", grad_vecs[:step // eig_freq]),
+                                   ("grad_norm", grad_norm[:step]),
                                    #("hessian_grad_product", hessian_gradient_product[:step // eig_freq]),
-                                   #("train_loss", train_loss[:step]),
-                                   #("test_loss", test_loss[:step]),
+                                   ("train_loss", train_loss[:step]), #("test_loss", test_loss[:step]),
                                    #("gauss_newton_eigs_w_class", gn_eigs_w_class[:step // eig_freq]),
                                    #("gauss_newton_eigs_w", gn_eigs_w[:step // eig_freq]),
                                    #("gauss_newton_eigs_u", gn_eigs_u[:step // eig_freq]),
@@ -232,87 +234,17 @@ def main(dataset: str, arch_id: str, loss: str, opt: str, lr: float, max_steps: 
         #print(f"{step}\t{train_loss[step]:.3f}\t{train_acc[step]:.3f}\t{test_loss[step]:.3f}\t{test_acc[step]:.3f}")
 
         #if (loss_goal != None and train_loss[step] < loss_goal) or (acc_goal != None and train_acc[step] > acc_goal):
-        if (loss_goal != None and train_loss[step] < loss_goal): # or (acc_goal != None and train_acc[step] > acc_goal):
-            param_vec = []
-            for param in network.parameters():
-                param_vec.append(param.view(-1))
-            param_vec = torch.cat(param_vec).detach().cpu().numpy()
-            np.save(f"{directory}/params/param_final.npy", param_vec)
-            break
-
-        optimizer.zero_grad()
+        grad = 0
         for (X, y) in iterate_dataset(train_dataset, physical_batch_size):
-            loss = loss_fn(network(X.to(device)), y.to(device)) / len(train_dataset)
-            if grad_step != -1 and eig_freq != -1 and step % eig_freq == 0:
-                (loss / grad_step).backward()
-            else:
-                loss.backward()
-        
-        if step > 0 and eig_freq != -1 and step % eig_freq == 0:
+            optimizer.zero_grad()
+            loss = loss_fn(network(X.to(device)), y.to(device)) / X.shape[0]
+            loss.backward()
             grad_vec = []
             for param in network.parameters():
                 grad_vec.append(param.grad.view(-1))
-            grad_vec = torch.cat(grad_vec).detach().cpu().numpy()
-            loss_eos.append(train_loss[step].detach().numpy())
-            np.save(f"{directory}/eos/grad_{step}.npy", grad_vec)
-        
-        if eos_log != -1 and count_down != 0 and not enter_eos:
-            grad_vec = []
-            for param in network.parameters():
-                grad_vec.append(param.grad.view(-1))
-            grad_vec = torch.cat(grad_vec).detach().cpu().numpy()
-            if len(grad_list) > 40:
-                grad_list = grad_list[1:]
-                loss_eos = loss_eos[1:]
-            grad_list.append(grad_vec)
-            loss_eos.append(train_loss[step].detach().numpy())
-        
-        if eos_log != -1 and enter_eos and count_down > 0:
-            grad_vec = []
-            for param in network.parameters():
-                grad_vec.append(param.grad.view(-1))
-            grad_vec = torch.cat(grad_vec).detach().cpu().numpy()
-            loss_eos.append(train_loss[step].detach().numpy())
-            np.save(f"{directory}/eos/grad_{step}.npy", grad_vec)
-
-            l_eig_eos, l_evec_eos, s_eig_eos, s_evec_eos = get_hessian_eigenvalues(network, loss_fn, lr, abridged_train, neigs=5,
-                                                                physical_batch_size=physical_batch_size)
-            l_eigs_eos.append(l_eig_eos.detach().float().numpy())
-            s_eigs_eos.append(s_eig_eos.detach().float().numpy())
-            np.save(f"{directory}/eos/l_evec_{step}.npy", l_evec_eos.detach().float().numpy())
-            np.save(f"{directory}/eos/s_evec_{step}.npy", s_evec_eos.detach().float().numpy())
-            count_down -= 1
-
-            np.save(f"{directory}/eos/largest_eigs_eos.npy", l_eigs_eos)
-            np.save(f"{directory}/eos/smallest_eigs_eos.npy", s_eigs_eos)
-            np.save(f"{directory}/eos/loss_eos.npy", loss_eos)
-        
-        if eos_log != -1 and enter_eos and count_down == 0:
-            np.save(f"{directory}/eos/largest_eigs_eos.npy", l_eigs_eos)
-            np.save(f"{directory}/eos/smallest_eigs_eos.npy", s_eigs_eos)
-            np.save(f"{directory}/eos/loss_eos.npy", loss_eos)
-            enter_eos = False
-            sys.exit()
-
-        if param_save != -1 and step % eig_freq ==  0:
-            param_vec = []
-            grad_vec = []
-            for param in network.parameters():
-                param_vec.append(param.view(-1))
-                grad_vec.append(param.grad.view(-1))
-            param_vec = torch.cat(param_vec).detach().cpu().numpy()
-            grad_vec = torch.cat(grad_vec).detach().cpu().numpy()
-            np.save(f"{directory}/params/param_{step}.npy", param_vec)
-            np.save(f"{directory}/grads/grad_{step}.npy", grad_vec)
-
-        if grad_step != -1 and eig_freq != -1 and step % eig_freq == 0:
-            for j in range(grad_step):
-                eigs_trim[step // eig_freq, :, j], _, _, _ = get_hessian_eigenvalues(network, loss_fn, lr, abridged_train, neigs=neigs,
-                                                                physical_batch_size=physical_batch_size, return_smallest=False)
-                optimizer.step()
-            save_files_final(directory, [("eigs_trim", eigs_trim[:(step + 1) // eig_freq])])
-        else:
             optimizer.step()
+            grad += torch.cat(grad_vec).detach().cpu() * X.shape[0]
+        grad_norm[step] = torch.norm(grad / len(train_dataset))
         #lr_scheduler.step()
     """
     save_files_final(directory,
@@ -320,7 +252,7 @@ def main(dataset: str, arch_id: str, loss: str, opt: str, lr: float, max_steps: 
                       ("train_loss", train_loss[:step + 1]), ("test_loss", test_loss[:step + 1]),
                       ("train_acc", train_acc[:step + 1]), ("test_acc", test_acc[:step + 1]), ("lr", lr_iter[:step + 1])])
     """
-    print("out loop")
+    
     if save_model:
         torch.save(network.state_dict(), f"{directory}/snapshot_final")
     

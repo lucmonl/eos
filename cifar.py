@@ -3,6 +3,7 @@ from torchvision.datasets import CIFAR10
 from typing import Tuple
 from torch.utils.data.dataset import TensorDataset
 import os
+import sys
 import torch
 from torch import Tensor
 import torch.nn.functional as F
@@ -50,6 +51,29 @@ def load_synthetic(dataset: str):
     test = TensorDataset(torch.from_numpy(x_test).float(), torch.from_numpy(y_test).float())
     return train, test
 
+def load_random(dataset: str):
+    N = 40
+    d = 100
+    np.random.seed(0)
+    X=np.random.normal(size=(N,d))
+
+    # Initialization beta_star,y,Loss array
+    sample_index=np.random.choice(np.arange(0,d),size=5)
+    beta_star=np.zeros((d,1))
+    for i in range(sample_index.shape[0]):
+        beta_star[sample_index[i],0]=np.random.normal()
+    # print(beta_star)
+
+    y=X@beta_star
+
+    x_train = X
+    y_train = y
+    x_test = X
+    y_test = y
+    train = TensorDataset(torch.from_numpy(x_train).float(), torch.from_numpy(y_train).float())
+    test = TensorDataset(torch.from_numpy(x_test).float(), torch.from_numpy(y_test).float())
+    return train, test
+
 def load_cifar(loss: str) -> (TensorDataset, TensorDataset):
     cifar10_train = CIFAR10(root=DATASETS_FOLDER, download=True, train=True)
     cifar10_test = CIFAR10(root=DATASETS_FOLDER, download=True, train=False)
@@ -57,6 +81,19 @@ def load_cifar(loss: str) -> (TensorDataset, TensorDataset):
     y_train, y_test = make_labels(torch.tensor(cifar10_train.targets), loss), \
         make_labels(torch.tensor(cifar10_test.targets), loss)
     center_X_train, center_X_test = center(X_train, X_test)
+    standardized_X_train, standardized_X_test = standardize(center_X_train, center_X_test)
+    train = TensorDataset(torch.from_numpy(unflatten(standardized_X_train, (32, 32, 3)).transpose((0, 3, 1, 2))).float(), y_train)
+    test = TensorDataset(torch.from_numpy(unflatten(standardized_X_test, (32, 32, 3)).transpose((0, 3, 1, 2))).float(), y_test)
+    return train, test
+
+def load_cifar_uncentered(loss: str) -> (TensorDataset, TensorDataset):
+    cifar10_train = CIFAR10(root=DATASETS_FOLDER, download=True, train=True)
+    cifar10_test = CIFAR10(root=DATASETS_FOLDER, download=True, train=False)
+    X_train, X_test = flatten(cifar10_train.data / 255), flatten(cifar10_test.data / 255)
+    y_train, y_test = make_labels(torch.tensor(cifar10_train.targets), loss), \
+        make_labels(torch.tensor(cifar10_test.targets), loss)
+    #center_X_train, center_X_test = center(X_train, X_test)
+    center_X_train, center_X_test = X_train, X_test
     standardized_X_train, standardized_X_test = standardize(center_X_train, center_X_test)
     train = TensorDataset(torch.from_numpy(unflatten(standardized_X_train, (32, 32, 3)).transpose((0, 3, 1, 2))).float(), y_train)
     test = TensorDataset(torch.from_numpy(unflatten(standardized_X_test, (32, 32, 3)).transpose((0, 3, 1, 2))).float(), y_test)

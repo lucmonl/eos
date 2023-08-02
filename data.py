@@ -2,7 +2,7 @@ import torch
 import numpy as np
 from typing import Tuple
 from torch.utils.data import TensorDataset
-from cifar import load_cifar, load_cifar_random, load_synthetic
+from cifar import load_cifar, load_cifar_random, load_synthetic, load_random
 from synthetic import make_chebyshev_dataset, make_linear_dataset
 # from wikitext import load_wikitext_2
 
@@ -11,7 +11,9 @@ DATASETS = [
     "chebyshev-4-20", "chebyshev-5-20", "linear-50-50","cifar10-1k-random-10", "cifar10-1k-random-5", 
     "cifar10-1k-random-2", "cifar10-1k-random-1", "cifar10-1k-random-3", "synthetic-1", "synthetic-5", "synthetic-cifar-1", 
     "synthetic-cifar-5", "synthetic-cifar-6", "synthetic-cifar-7", "synthetic-cifar-8", 
-    "synthetic-reduced-cifar-1","synthetic-unbalanced-reduced-cifar-1", "synthetic-allzero-reduced-cifar-1"
+    "synthetic-reduced-cifar-1","synthetic-unbalanced-reduced-cifar-1", "synthetic-unbalanced90-reduced-cifar-1", 
+    "synthetic-unbalanced50-reduced-cifar-1", "synthetic-unbalanced99-reduced-cifar-1", "synthetic-allzero-reduced-cifar-1",
+    "synthetic-featScale-reduced-cifar-1", "random", "synthetic-cifar-uncentered-7"
 ]
 
 def flatten(arr: np.ndarray):
@@ -49,6 +51,10 @@ def num_classes(dataset_name: str) -> int:
     elif dataset_name.startswith('synthetic'):
         num_class = int(dataset_name.split("-")[-1])
         return num_class
+    elif dataset_name.startswith("random"):
+        return 1
+    else:
+        assert False
 
 def get_pooling(pooling: str):
     if pooling == 'max':
@@ -63,6 +69,8 @@ def num_pixels(dataset_name: str) -> int:
         return num_input_channels(dataset_name) * image_size(dataset_name)**2
     elif dataset_name.startswith("synthetic"):
         return 50
+    elif dataset_name.startswith("random"):
+        return 100
     else:
         assert False
 
@@ -109,6 +117,10 @@ def load_dataset(dataset_name: str, loss: str) -> (TensorDataset, TensorDataset)
 
     elif dataset_name.startswith("synthetic"):
         train, test = load_synthetic(dataset_name)
-        return train, test 
+        return train, test
+    
+    elif dataset_name == 'random':
+        train, test = load_random(dataset_name)
+        return train, test
 
 

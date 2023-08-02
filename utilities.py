@@ -150,6 +150,19 @@ def compute_hvp(network: nn.Module, loss_fn: nn.Module,
     vector = vector.to(device)
     for (X, y) in iterate_dataset(dataset, physical_batch_size):
         loss = loss_fn(network(X), y) / n
+        #print(loss)
+        #for param in network.parameters():
+        #    print(param.data)
+        """
+        param_list = []
+        for param in network.parameters():
+            param_list.append(param)
+            assert param.requires_grad
+        beta = torch.square(param_list[0]) - torch.square(param_list[1])
+        loss = 0.25*torch.mean((X@beta-y)**2)
+        """
+        #loss = loss_fn(network(X), y) / n
+        #loss = 0.25 * torch.mean((network(X).squeeze()-y.squeeze())**2)
         grads = torch.autograd.grad(loss, inputs=network.parameters(), create_graph=True)
         dot = parameters_to_vector(grads).mul(vector).sum()
         grads = [g.contiguous() for g in torch.autograd.grad(dot, network.parameters(), retain_graph=True)]
@@ -191,6 +204,9 @@ def lanczos(matrix_vector, dim: int, neigs: int):
 
 def get_hessian_eigenvalues(network: nn.Module, loss_fn: nn.Module, lr: float, dataset: Dataset,
                             neigs=6, physical_batch_size=1000, return_smallest = True):
+    #vector_test = torch.ones(200)
+    #print(compute_hvp(network, loss_fn, dataset, vector_test, physical_batch_size=physical_batch_size))
+    #sys.exit()
     """ Compute the leading Hessian eigenvalues. """
     alpha = 4 / lr
     s_evals, s_evecs = 0, 0
@@ -596,7 +612,8 @@ def compute_gradient_at_theta(network: nn.Module, loss_fn: nn.Module, dataset: D
 
 class SquaredLoss(nn.Module):
     def forward(self, input: Tensor, target: Tensor):
-        return 0.5 * ((input - target) ** 2).sum()
+        #return 0.5 * ((input - target) ** 2).sum()
+        return 0.25 * ((input - target) ** 2).sum()
 
 
 class SquaredAccuracy(nn.Module):

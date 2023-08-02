@@ -112,6 +112,9 @@ def weight_norm_net(dataset_name: str, widths: List[int], activation: str, bias:
     #modules.append(Scale(1/np.sqrt(widths[-1])))
     return nn.Sequential(*modules)
 
+def resnet(dataset_name: str, widths: List[int], activation: str, bias: bool = True) -> nn.Module:
+    
+
 def fc_scale_net(dataset_name: str, widths: List[int], activation: str, bias: bool = True) -> nn.Module:
     modules = [nn.Flatten()]
     for l in range(len(widths)):
