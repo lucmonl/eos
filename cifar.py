@@ -34,6 +34,8 @@ def make_labels(y, loss):
         return y
     elif loss == "mse":
         return _one_hot(y, 10, 0)
+    elif loss == "exp":
+        return _one_hot(y, 10, 0)
 
 def make_labels_random(y, loss, num_class):
     if loss == "ce":

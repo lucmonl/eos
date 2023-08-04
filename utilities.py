@@ -96,6 +96,8 @@ def get_loss_and_acc(loss: str):
         return SquaredLoss(), SquaredAccuracy()
     elif loss == "ce":
         return nn.CrossEntropyLoss(reduction='sum'), AccuracyCE()
+    elif loss == "exp":
+        return ExponentialLoss(), SquaredAccuracy()
     raise NotImplementedError(f"no such loss function: {loss}")
 
 def compute_loss_linear(network, loss_fn, X, y):
@@ -615,6 +617,10 @@ class SquaredLoss(nn.Module):
         #return 0.5 * ((input - target) ** 2).sum()
         return 0.25 * ((input - target) ** 2).sum()
 
+class ExponentialLoss(nn.Module):
+    def forward(self, input: Tensor, target: Tensor):
+        target = 2*(target - 0.5)
+        return torch.mean(torch.exp(-input * target))
 
 class SquaredAccuracy(nn.Module):
     def __init__(self):

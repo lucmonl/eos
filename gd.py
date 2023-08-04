@@ -204,7 +204,7 @@ def main(dataset: str, arch_id: str, loss: str, opt: str, lr: float, max_steps: 
                                    #("loss_derivative", loss_dv[:step // eig_freq]),
                                    #("grad_vecs", grad_vecs[:step // eig_freq]),
                                    #("hessian_grad_product", hessian_gradient_product[:step // eig_freq]),
-                                   #("train_loss", train_loss[:step]),
+                                   ("train_loss", train_loss[:step]),
                                    #("test_loss", test_loss[:step]),
                                    #("gauss_newton_eigs_w_class", gn_eigs_w_class[:step // eig_freq]),
                                    #("gauss_newton_eigs_w", gn_eigs_w[:step // eig_freq]),
@@ -329,7 +329,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train using gradient descent.")
     parser.add_argument("dataset", type=str, choices=DATASETS, help="which dataset to train")
     parser.add_argument("arch_id", type=str, help="which network architectures to train")
-    parser.add_argument("loss", type=str, choices=["ce", "mse"], help="which loss function to use")
+    parser.add_argument("loss", type=str, choices=["ce", "mse", "exp"], help="which loss function to use")
     parser.add_argument("lr", type=float, help="the learning rate")
     parser.add_argument("max_steps", type=int, help="the maximum number of gradient steps to train for")
     parser.add_argument("--opt", type=str, choices=["gd", "polyak", "nesterov"],
